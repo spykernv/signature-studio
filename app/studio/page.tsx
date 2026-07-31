@@ -374,31 +374,12 @@ export default function StudioPage() {
               Gmail allows 10 000
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <a
-                href={result.portrait}
-                download="signature-portrait.gif"
-                className="bg-ink px-5 py-2.5 text-[13px] text-white"
-              >
-                Download the portrait
-              </a>
-              {result.wordmark && (
-                <a
-                  href={result.wordmark}
-                  download="signature-name.gif"
-                  className="border border-line px-4 py-2.5 text-[13px] hover:border-ink"
-                >
-                  Download the name
-                </a>
-              )}
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="text-[13px] text-mute underline underline-offset-4 hover:text-ink"
-              >
-                Change the details
-              </button>
-            </div>
+            {/* The download links sit BELOW the publish/copy block and read as an escape hatch,
+                which is what they are. They were the primary black button while copying was the
+                afterthought underneath — an inversion inherited from the phase where there was
+                no hosting and self-hosting was the only route. Two prominent download buttons
+                also raise a question nobody wants ("which of these two files do I need?") that
+                copying makes disappear entirely. */}
 
             {published === null ? (
               <div className="mt-10">
@@ -446,6 +427,33 @@ export default function StudioPage() {
                 </p>
               </div>
             )}
+
+            <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-6 text-[13px] text-mute">
+              <span>Rather host it yourself?</span>
+              <a
+                href={result.portrait}
+                download="signature-portrait.gif"
+                className="underline underline-offset-4 hover:text-ink"
+              >
+                Download the portrait
+              </a>
+              {result.wordmark && (
+                <a
+                  href={result.wordmark}
+                  download="signature-name.gif"
+                  className="underline underline-offset-4 hover:text-ink"
+                >
+                  Download the name
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="underline underline-offset-4 hover:text-ink"
+              >
+                Change the details
+              </button>
+            </div>
 
             <div className="mt-14">
               <PasteSteps />
