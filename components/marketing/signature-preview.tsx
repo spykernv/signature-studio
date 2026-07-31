@@ -20,8 +20,14 @@ const PORTRAIT_H = 138;
  * relative path against. In development the reference GIF is served by the fixture route, so
  * the swap seam is an env var rather than an edit.
  */
+/**
+ * A real public asset, not the fixture route. That route is gated off in production, so the
+ * hero of the landing page — the one thing a visitor sees before deciding whether to bother —
+ * was a broken image the moment this deployed. The demo GIF is the signature the tool was
+ * reverse-engineered from, so it is also an honest sample of the output.
+ */
 export const DEMO_PORTRAIT_SRC =
-  process.env.NEXT_PUBLIC_DEMO_PORTRAIT_URL ?? "/api/fixture/reference-sig-a.gif";
+  process.env.NEXT_PUBLIC_DEMO_PORTRAIT_URL ?? "/demo-portrait.gif";
 
 /**
  * The site's own fonts come from next/font, which mangles the family name at build time, so

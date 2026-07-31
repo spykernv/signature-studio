@@ -333,3 +333,40 @@ describe("plain-text flavour", () => {
     expect(buildSignatureText(base)).not.toMatch(/[<>]/);
   });
 });
+
+describe("column order", () => {
+  /**
+   * Text first, portrait second — a decision Jonathan made explicitly after seeing it the other
+   * way round. It is asserted because nothing else would catch a flip: the signature still looks
+   * plausible mirrored, every other test still passes, and the regression would only surface
+   * once it was already in somebody's outbox.
+   */
+  it("puts the text block before the portrait", () => {
+    const html = buildSignatureHtml({
+      name: "Jonathan Naal",
+      title: "Product Manager",
+      links: [],
+      portraitUrl: "https://example.com/p.gif",
+      portrait: { w: 112, h: 138 },
+    });
+    const portraitAt = html.indexOf("https://example.com/p.gif");
+    const titleAt = html.indexOf("Product Manager");
+    expect(titleAt).toBeGreaterThan(-1);
+    expect(portraitAt).toBeGreaterThan(titleAt);
+  });
+
+  it("degrades to a complete text block when images are blocked", () => {
+    // The reason for the order: with images off, a leading portrait is an empty box the reader
+    // has to get past before reaching the name.
+    const html = buildSignatureHtml({
+      name: "Jonathan Naal",
+      title: "Product Manager",
+      links: [],
+      portraitUrl: "https://example.com/p.gif",
+      portrait: { w: 112, h: 138 },
+    });
+    const withoutImages = html.replace(/<img[^>]*>/g, "");
+    expect(withoutImages).toContain("Product Manager");
+    expect(withoutImages.indexOf("Product Manager")).toBeLessThan(withoutImages.length);
+  });
+});

@@ -296,15 +296,19 @@ export function buildSignatureHtml(d: SignatureData, opts: BuildOptions = {}): s
   const html =
     `<table border="0" cellpadding="0" cellspacing="0" role="presentation" ` +
     `style="border-collapse:collapse;border-spacing:0;font-family:${SANS};color:${INK};">` +
+    // TEXT FIRST, PORTRAIT SECOND. The order matters beyond taste: a recipient who blocks
+    // images sees an empty box where a leading portrait would be, and has to read past it to
+    // reach the name. Leading with the text means the signature degrades to a plain, complete
+    // text block instead of a gap followed by words.
     `<tr>` +
-    `<td width="${pw}" style="padding:0 16px 0 0;vertical-align:top;">` +
-    img(portraitSrc, pw, ph, name) +
-    `</td>` +
-    `<td style="padding:0;vertical-align:top;">` +
+    `<td style="padding:0 22px 0 0;vertical-align:top;">` +
     `<table border="0" cellpadding="0" cellspacing="0" role="presentation" ` +
     `style="border-collapse:collapse;border-spacing:0;font-family:${SANS};">` +
     rows.join("") +
     `</table>` +
+    `</td>` +
+    `<td width="${pw}" style="padding:0;vertical-align:top;">` +
+    img(portraitSrc, pw, ph, name) +
     `</td>` +
     `</tr>` +
     `</table>`;
