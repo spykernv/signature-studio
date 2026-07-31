@@ -42,9 +42,15 @@ export default function StudioPage() {
     email: "",
     links: [],
   });
-  const [result, setResult] = useState<{ portrait: string; wordmark: string | null; bytes: number } | null>(
-    null,
-  );
+  const [result, setResult] = useState<{
+    /** Object URLs, for the on-screen preview only — see the `preview` flag on the builder. */
+    portrait: string;
+    wordmark: string | null;
+    bytes: number;
+    /** The raw files, kept because publishing has to re-send them. */
+    portraitData: Uint8Array;
+    wordmarkData: Uint8Array | null;
+  } | null>(null);
 
   const encoder = useEncoder();
 
@@ -122,19 +128,53 @@ export default function StudioPage() {
         portrait: url(out.portrait),
         wordmark: out.wordmark ? url(out.wordmark) : null,
         bytes: out.portrait.byteLength + (out.wordmark?.byteLength ?? 0),
+        portraitData: out.portrait,
+        wordmarkData: out.wordmark,
       });
+      setPublished(null);
+      setPublishError(null);
       setStep(3);
     } finally {
       setBusy(false);
     }
   };
 
-  // Where the user has published the GIFs, once they have. Hosting is not part of this phase —
-  // the honest handoff is "download these, put them somewhere public, paste the address back".
-  // A signature carrying a blob: URL is broken for every recipient AND for the sender on their
-  // next reload, so the copy button stays shut until a real address exists.
-  const [hosted, setHosted] = useState({ portrait: "", wordmark: "" });
-  const hostedOk = /^https?:\/\/\S+$/i.test(hosted.portrait);
+  // The public addresses, once the GIFs have been uploaded. A signature carrying a blob: URL is
+  // broken for every recipient AND for the sender on their next reload, so nothing may be
+  // copied until these exist.
+  const [published, setPublished] = useState<{ portraitUrl: string; wordmarkUrl: string | null } | null>(
+    null,
+  );
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
+
+  const publish = async () => {
+    if (!result) return null;
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      const body = new FormData();
+      body.append("portrait", new Blob([new Uint8Array(result.portraitData)], { type: "image/gif" }));
+      if (result.wordmarkData) {
+        body.append("wordmark", new Blob([new Uint8Array(result.wordmarkData)], { type: "image/gif" }));
+      }
+      const res = await fetch("/api/publish", { method: "POST", body });
+      const json = (await res.json()) as
+        | { portraitUrl: string; wordmarkUrl: string | null }
+        | { error: string };
+      if (!res.ok || "error" in json) {
+        setPublishError("error" in json ? json.error : "Could not publish.");
+        return null;
+      }
+      setPublished(json);
+      return json;
+    } catch {
+      setPublishError("Could not reach the server. Your download still works.");
+      return null;
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const signature: SignatureData | null = result
     ? {
@@ -360,55 +400,52 @@ export default function StudioPage() {
               </button>
             </div>
 
-            <div className="mt-12 border-t border-line pt-8">
-              <p className="stamp">Then put it online</p>
-              <p className="mt-3 max-w-xl text-[13px] leading-relaxed text-mute">
-                Mail signatures link to images, they cannot carry them. Drop the file you just
-                downloaded onto{" "}
-                <a
-                  className="text-ink underline underline-offset-4"
-                  href="https://app.netlify.com/drop"
-                  target="_blank"
-                  rel="noreferrer noopener"
+            {published === null ? (
+              <div className="mt-10">
+                <button
+                  type="button"
+                  onClick={() => void publish()}
+                  disabled={publishing}
+                  className="bg-ink px-5 py-2.5 text-[13px] text-white disabled:bg-line-2 disabled:text-mute"
                 >
-                  netlify.com/drop
-                </a>{" "}
-                — no account needed — and paste the address it gives you here.
-              </p>
-
-              <div className="mt-6 max-w-xl space-y-5">
-                <Field
-                  label="Address of the portrait GIF"
-                  value={hosted.portrait}
-                  onChange={(v) => setHosted({ ...hosted, portrait: v })}
-                />
-                {result.wordmark && (
-                  <Field
-                    label="Address of the name GIF"
-                    value={hosted.wordmark}
-                    onChange={(v) => setHosted({ ...hosted, wordmark: v })}
-                  />
-                )}
-              </div>
-
-              <div className="mt-8">
-                {hostedOk ? (
-                  <CopySignature
-                    data={{
-                      ...signature,
-                      portraitUrl: hosted.portrait.trim(),
-                      nameUrl: hosted.wordmark.trim() || undefined,
-                    }}
-                  />
-                ) : (
-                  <p className="border-l-2 border-line-2 pl-3 text-[13px] leading-relaxed text-mute">
-                    Copying unlocks once there is a public address. The preview above uses a
-                    temporary one that only exists in this tab — it would show a broken image to
-                    everyone you sent it to.
+                  {publishing ? "Publishing…" : "Publish, then copy"}
+                </button>
+                <p className="mt-4 max-w-xl text-[13px] leading-relaxed text-mute">
+                  A mail signature can only link to images, it cannot carry them — so the two
+                  small GIFs above go online at a permanent address, and the signature points at
+                  them. That address is public and unguessable. Nothing else about you is
+                  uploaded, and your original photo never left this device.
+                </p>
+                {publishError && (
+                  <p className="mt-4 max-w-xl border-l-2 border-ink pl-3 text-[13px] leading-relaxed">
+                    {publishError}
                   </p>
                 )}
               </div>
-            </div>
+            ) : (
+              <div className="mt-10">
+                {/* Publishing and copying are two clicks on purpose. The clipboard write has to
+                    happen inside the click that triggers it — Safari discards a write whose
+                    promise settles after the gesture ends — and an upload cannot fit inside
+                    that window. Splitting them also makes the upload a decision rather than a
+                    side effect of arriving on this screen. */}
+                <CopySignature
+                  data={{
+                    ...signature,
+                    portraitUrl: published.portraitUrl,
+                    nameUrl: published.wordmarkUrl ?? undefined,
+                  }}
+                />
+                <p className="mt-4 max-w-xl text-[13px] leading-relaxed text-mute">
+                  Published. Keep this address if you ever want to point at it again — editing
+                  your photo later produces a new one, because Gmail caches images at a URL and
+                  never expires them.
+                </p>
+                <p className="mono mt-3 max-w-xl break-all text-[11px] text-mute-2">
+                  {published.portraitUrl}
+                </p>
+              </div>
+            )}
 
             <div className="mt-14">
               <PasteSteps />
