@@ -133,6 +133,20 @@ const LINK_SCHEMES = ["http:", "https:", "mailto:"] as const;
 const IMAGE_SCHEMES = ["http:", "https:"] as const;
 
 /**
+ * The same markup, but rendered on THIS page rather than pasted into a mail client.
+ *
+ * The studio produces its GIFs in the browser and holds them as `blob:` object URLs, which the
+ * deliverable must never contain — a blob URL is scoped to the tab that created it, so a
+ * signature carrying one shows a broken image to every recipient, and to the sender too the
+ * moment they reload. So `buildSignatureHtml` rejects them, correctly.
+ *
+ * But the on-screen preview has to show those very blobs, and it has to show them through the
+ * SAME builder, or the thing being previewed is not the thing being shipped. Hence a second
+ * allowlist used only by `{ preview: true }`, never on the copy path.
+ */
+const PREVIEW_IMAGE_SCHEMES = ["http:", "https:", "blob:", "data:"] as const;
+
+/**
  * Deliberately loose. A signature is not an authentication boundary, so the job here is to
  * reject things that are not addresses at all — anything that could smuggle a scheme or break
  * out of the mailto: URL — not to adjudicate RFC 5322.
@@ -191,13 +205,22 @@ function row(padTop: number, style: string, content: string): string {
   return `<tr><td style="${pad}${style}">${content}</td></tr>`;
 }
 
-export function buildSignatureHtml(d: SignatureData): string {
+export interface BuildOptions {
+  /**
+   * Render for the on-screen preview, which permits `blob:` and `data:` image URLs. NEVER set
+   * this on the copy path: those URLs are meaningless outside the tab that made them.
+   */
+  preview?: boolean;
+}
+
+export function buildSignatureHtml(d: SignatureData, opts: BuildOptions = {}): string {
+  const imageSchemes = opts.preview ? PREVIEW_IMAGE_SCHEMES : IMAGE_SCHEMES;
   const name = clean(d.name);
   if (name.length === 0) throw new Error("name is required");
   const title = clean(d.title);
   const organization = d.organization ? clean(d.organization) : "";
 
-  const portraitSrc = safeUrl(d.portraitUrl, IMAGE_SCHEMES);
+  const portraitSrc = safeUrl(d.portraitUrl, imageSchemes);
   if (portraitSrc === null) {
     // Unlike a user-typed link, this URL comes from our own upload step. A bad one is a bug in
     // the pipeline, and a signature with no portrait is not a degraded signature, it is a
@@ -211,7 +234,7 @@ export function buildSignatureHtml(d: SignatureData): string {
 
   // A wordmark that fails validation degrades to live text rather than throwing: the name is
   // recoverable in a way the portrait is not.
-  const nameSrc = d.nameUrl ? safeUrl(d.nameUrl, IMAGE_SCHEMES) : null;
+  const nameSrc = d.nameUrl ? safeUrl(d.nameUrl, imageSchemes) : null;
 
   const rows: string[] = [];
 
